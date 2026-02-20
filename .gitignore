@@ -23,6 +23,3 @@ venv/
 
 # Render
 .render/
-
-# Runtime
-runtime.txt
