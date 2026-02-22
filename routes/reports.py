@@ -6,102 +6,105 @@ router = APIRouter()
 
 @router.get("/reports")
 def get_reports(
-    period: str = Query(None),
+    period: str = Query("daily"),
     start_date: str = Query(None),
     end_date: str = Query(None)
 ):
     now = datetime.utcnow()
 
-    # ---------------------------
-    # Determine Date Range
-    # ---------------------------
-    if period == "daily":
-        start = datetime(now.year, now.month, now.day)
-        end = start + timedelta(days=1)
-
-    elif period == "weekly":
-        start = now - timedelta(days=7)
-        end = now
-
-    elif period == "monthly":
-        start = now - timedelta(days=30)
-        end = now
-
-    elif start_date and end_date:
+    # ----------------------------------
+    # Custom Range Has Highest Priority
+    # ----------------------------------
+    if start_date and end_date:
         start = datetime.fromisoformat(start_date)
-        end = datetime.fromisoformat(end_date)
+        end = datetime.fromisoformat(end_date) + timedelta(days=1)
 
+    # ----------------------------------
+    # Otherwise Use Period
+    # ----------------------------------
     else:
-        return {"error": "Provide period or start_date & end_date"}
+        if period == "daily":
+            start = datetime(now.year, now.month, now.day)
+            end = start + timedelta(days=1)
 
-    # ---------------------------
+        elif period == "weekly":
+            start = now - timedelta(days=7)
+            end = now
+
+        elif period == "monthly":
+            start = now - timedelta(days=30)
+            end = now
+
+        else:
+            return {"error": "Invalid period"}
+
+    # ----------------------------------
     # Fetch Sales
-    # ---------------------------
+    # ----------------------------------
     sales = list(db.sales.find({
         "created_at": {"$gte": start, "$lte": end}
     }))
 
+    # ----------------------------------
+    # If No Sales
+    # ----------------------------------
     if not sales:
         return {
-            "metrics": {},
+            "metrics": {
+                "total_sales": 0,
+                "transactions": 0,
+                "average_order_value": 0,
+                "total_profit": 0,
+                "profit_margin": 0
+            },
             "sales_trend": [],
             "top_products": []
         }
 
-    # ---------------------------
+    # ----------------------------------
     # Calculate Metrics
-    # ---------------------------
-    total_sales = sum(s["total_amount"] for s in sales)
+    # ----------------------------------
+    total_sales = sum(s.get("total_amount", 0) for s in sales)
     total_transactions = len(sales)
     avg_order_value = total_sales / total_transactions if total_transactions else 0
 
     total_profit = 0
     product_summary = {}
+    trend = {}
 
     for sale in sales:
-        for item in sale["items"]:
-            revenue = item["total"]
-            cost = item["cost_price"] * item["quantity"]
+
+        # Trend grouping
+        date_key = sale["created_at"].strftime("%Y-%m-%d")
+        trend[date_key] = trend.get(date_key, 0) + sale.get("total_amount", 0)
+
+        for item in sale.get("items", []):
+            revenue = item.get("total", 0)
+            cost = item.get("cost_price", 0) * item.get("quantity", 0)
             profit = revenue - cost
             total_profit += profit
 
-            pid = str(item["product_id"])
+            pid = str(item.get("product_id"))
 
             if pid not in product_summary:
                 product_summary[pid] = {
-                    "name": item["name"],
+                    "name": item.get("name"),
                     "quantity": 0,
                     "revenue": 0,
                     "profit": 0
                 }
 
-            product_summary[pid]["quantity"] += item["quantity"]
+            product_summary[pid]["quantity"] += item.get("quantity", 0)
             product_summary[pid]["revenue"] += revenue
             product_summary[pid]["profit"] += profit
 
     profit_margin = (total_profit / total_sales * 100) if total_sales else 0
-
-    # ---------------------------
-    # Sales Trend (Group by Date)
-    # ---------------------------
-    trend = {}
-
-    for sale in sales:
-        date_key = sale["created_at"].strftime("%Y-%m-%d")
-
-        if date_key not in trend:
-            trend[date_key] = 0
-
-        trend[date_key] += sale["total_amount"]
 
     sales_trend = [
         {"date": k, "total": v}
         for k, v in sorted(trend.items())
     ]
 
-    # ---------------------------
-    # Top Selling Products
-    # ---------------------------
     top_products = sorted(
         product_summary.values(),
         key=lambda x: x["quantity"],
