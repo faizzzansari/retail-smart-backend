@@ -1,34 +1,59 @@
-from fastapi import APIRouter
 from database import products_collection
 from bson import ObjectId
-from models import Product
+from fastapi import APIRouter, HTTPException
+from models import ProductCreate
+from database import db
+from datetime import datetime
 
 router = APIRouter()
 
 LOW_STOCK_LIMIT = 5
 
 @router.post("/add-product")
-def add_product(product: Product):
+def add_product(product: ProductCreate):
+
+    # Check if SKU already exists
+    existing = db.products.find_one({"sku": product.sku})
+    if existing:
+        raise HTTPException(status_code=400, detail="SKU already exists")
+
     product_dict = product.dict()
-    result = products_collection.insert_one(product_dict)
-    return {"message": "Product added", "id": str(result.inserted_id)}
+    product_dict["created_at"] = datetime.utcnow()
+
+    result = db.products.insert_one(product_dict)
+
+    return {
+        "message": "Product added successfully",
+        "id": str(result.inserted_id)
+    }
 
 @router.get("/products")
 def get_products():
-    products = []
-    for product in products_collection.find():
-        product["_id"] = str(product["_id"])
-        products.append(product)
-    return products
+    products = list(db.products.find())
 
-# @router.get("/products")
-# def get_products():
-#     products = []
-#     for product in products_collection.find():
-#         product["id"] = str(product["_id"])
-#         del product["_id"]
-#         products.append(product)
-#     return products
+    response = []
+
+    for product in products:
+        margin = ((product["selling_price"] - product["cost_price"]) 
+                  / product["cost_price"]) * 100
+
+        response.append({
+            "id": str(product["_id"]),
+            "name": product["name"],
+            "sku": product["sku"],
+            "barcode": product.get("barcode"),
+            "category": product["category"],
+            "cost_price": product["cost_price"],
+            "selling_price": product["selling_price"],
+            "margin": round(margin, 2),
+            "stock": product["stock"],
+            "minimum_stock_alert": product["minimum_stock_alert"],
+            "description": product.get("description"),
+            "image_url": product.get("image_url"),
+            "created_at": product["created_at"]
+        })
+
+    return response
 
 @router.delete("/delete-product/{product_id}")
 def delete_product(product_id: str):
@@ -36,16 +61,18 @@ def delete_product(product_id: str):
     return {"message": "Product deleted"}
 
 @router.get("/low-stock")
-def get_low_stock_products():
-    low_stock_products = []
+def low_stock_products():
+    products = list(db.products.find())
 
-    for product in products_collection.find({"stock": {"$lte": LOW_STOCK_LIMIT}}):
-        product["id"] = str(product["_id"])
-        del product["_id"]
-        low_stock_products.append(product)
+    low_stock = []
 
-    return {
-        "threshold": LOW_STOCK_LIMIT,
-        "low_stock_count": len(low_stock_products),
-        "products": low_stock_products
-    }
+    for product in products:
+        if product["stock"] <= product["minimum_stock_alert"]:
+            low_stock.append({
+                "id": str(product["_id"]),
+                "name": product["name"],
+                "stock": product["stock"],
+                "minimum_stock_alert": product["minimum_stock_alert"]
+            })
+
+    return low_stock
