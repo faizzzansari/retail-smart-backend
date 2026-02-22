@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from database import db
-from models import SaleCreate
+from models.sale import SaleCreate
 from bson import ObjectId
 from datetime import datetime
 

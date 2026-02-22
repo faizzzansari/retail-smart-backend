@@ -1,7 +1,7 @@
 from database import products_collection
 from bson import ObjectId
 from fastapi import APIRouter, HTTPException
-from models import ProductCreate
+from models.product import ProductCreate
 from database import db
 from datetime import datetime
 

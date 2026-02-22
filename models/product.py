@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
+
 
 class ProductCreate(BaseModel):
     name: str = Field(..., min_length=1)
@@ -36,24 +37,3 @@ class ProductResponse(BaseModel):
     image_url: Optional[str]
 
     created_at: datetime
-
-
-class SaleItem(BaseModel):
-    product_id: str
-    quantity: int
-
-class SaleCreate(BaseModel):
-    items: List[SaleItem]
-
-    customer_name: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-
-    payment_method: str
-    amount_tendered: Optional[float] = 0
-
-    discount_type: Optional[str] = None  # percentage / flat
-    discount_value: Optional[float] = 0
-    discount_reason: Optional[str] = None
-
-    tax_percentage: float = 0
