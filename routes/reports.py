@@ -54,7 +54,7 @@ def get_reports(
             "top_products": []
         }
 
-    # ----------------------------------
+       # ----------------------------------
     # Metrics Calculation
     # ----------------------------------
     total_sales = 0
@@ -66,19 +66,26 @@ def get_reports(
 
     for sale in sales:
 
-        sale_total = sale.get("total", 0)  # ✅ CORRECT FIELD
+        # ✅ Use stored total directly
+        sale_total = sale.get("total", 0)
         total_sales += sale_total
 
-        # Trend grouping (daily)
-        date_key = sale["created_at"].strftime("%Y-%m-%d")
-        trend[date_key] = trend.get(date_key, 0) + sale_total
+        # ✅ Trend grouping
+        created_at = sale.get("created_at")
+        if created_at:
+            date_key = created_at.strftime("%Y-%m-%d")
+            trend[date_key] = trend.get(date_key, 0) + sale_total
 
+        # ✅ Loop items
         for item in sale.get("items", []):
+
             quantity = item.get("quantity", 0)
-            selling_price = item.get("price", 0)  # match what you store
+
+            # ✅ Use stored total from item (VERY IMPORTANT)
+            item_total = item.get("total", 0)
             cost_price = item.get("cost_price", 0)
 
-            revenue = quantity * selling_price
+            revenue = item_total
             cost = quantity * cost_price
             profit = revenue - cost
 
@@ -116,15 +123,3 @@ def get_reports(
         key=lambda x: x["quantity"],
         reverse=True
     )[:5]
-
-    return {
-        "metrics": {
-            "total_sales": round(total_sales, 2),
-            "transactions": total_transactions,
-            "average_order_value": round(avg_order_value, 2),
-            "total_profit": round(total_profit, 2),
-            "profit_margin": round(profit_margin, 2)
-        },
-        "sales_trend": sales_trend,
-        "top_products": top_products
-    }
