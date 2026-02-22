@@ -130,20 +130,3 @@ def get_frequent_customers():
         })
 
     return result
-
-@router.get("/customers/search")
-def search_customer(phone: str):
-
-    customer = db.customers.find_one({"phone": phone})
-
-    if not customer:
-        return {"message": "Customer not found"}
-
-    return {
-        "id": str(customer["_id"]),
-        "name": customer["name"],
-        "phone": customer["phone"],
-        "email": customer.get("email"),
-        "visit_count": customer["visit_count"],
-        "total_purchases": customer["total_purchases"]
-    }
