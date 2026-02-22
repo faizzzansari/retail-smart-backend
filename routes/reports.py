@@ -13,15 +13,11 @@ def get_reports(
     now = datetime.utcnow()
 
     # ----------------------------------
-    # Custom Range Has Highest Priority
+    # Date Range Logic
     # ----------------------------------
     if start_date and end_date:
         start = datetime.fromisoformat(start_date)
         end = datetime.fromisoformat(end_date) + timedelta(days=1)
-
-    # ----------------------------------
-    # Otherwise Use Period
-    # ----------------------------------
     else:
         if period == "daily":
             start = datetime(now.year, now.month, now.day)
@@ -45,9 +41,6 @@ def get_reports(
         "created_at": {"$gte": start, "$lte": end}
     }))
 
-    # ----------------------------------
-    # If No Sales
-    # ----------------------------------
     if not sales:
         return {
             "metrics": {
@@ -62,26 +55,33 @@ def get_reports(
         }
 
     # ----------------------------------
-    # Calculate Metrics
+    # Metrics Calculation
     # ----------------------------------
-    total_sales = sum(s.get("total_amount", 0) for s in sales)
-    total_transactions = len(sales)
-    avg_order_value = total_sales / total_transactions if total_transactions else 0
-
+    total_sales = 0
     total_profit = 0
+    total_transactions = len(sales)
+
     product_summary = {}
     trend = {}
 
     for sale in sales:
 
-        # Trend grouping
+        sale_total = sale.get("total", 0)  # ✅ CORRECT FIELD
+        total_sales += sale_total
+
+        # Trend grouping (daily)
         date_key = sale["created_at"].strftime("%Y-%m-%d")
-        trend[date_key] = trend.get(date_key, 0) + sale.get("total_amount", 0)
+        trend[date_key] = trend.get(date_key, 0) + sale_total
 
         for item in sale.get("items", []):
-            revenue = item.get("total", 0)
-            cost = item.get("cost_price", 0) * item.get("quantity", 0)
+            quantity = item.get("quantity", 0)
+            selling_price = item.get("price", 0)  # match what you store
+            cost_price = item.get("cost_price", 0)
+
+            revenue = quantity * selling_price
+            cost = quantity * cost_price
             profit = revenue - cost
+
             total_profit += profit
 
             pid = str(item.get("product_id"))
@@ -94,14 +94,20 @@ def get_reports(
                     "profit": 0
                 }
 
-            product_summary[pid]["quantity"] += item.get("quantity", 0)
+            product_summary[pid]["quantity"] += quantity
             product_summary[pid]["revenue"] += revenue
             product_summary[pid]["profit"] += profit
 
-    profit_margin = (total_profit / total_sales * 100) if total_sales else 0
+    avg_order_value = (
+        total_sales / total_transactions if total_transactions else 0
+    )
+
+    profit_margin = (
+        (total_profit / total_sales) * 100 if total_sales else 0
+    )
 
     sales_trend = [
-        {"date": k, "total": v}
+        {"date": k, "total": round(v, 2)}
         for k, v in sorted(trend.items())
     ]
 
