@@ -1,9 +1,11 @@
 from database import products_collection
 from bson import ObjectId
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from models.product import ProductCreate
 from database import db
 from datetime import datetime
+import shutil
+import os
 
 router = APIRouter()
 
@@ -59,6 +61,52 @@ def get_products():
 def delete_product(product_id: str):
     products_collection.delete_one({"_id": ObjectId(product_id)})
     return {"message": "Product deleted"}
+
+@router.put("/update-product/{product_id}")
+def update_product(product_id: str, product: ProductCreate):
+
+    # Check if valid ObjectId
+    if not ObjectId.is_valid(product_id):
+        raise HTTPException(status_code=400, detail="Invalid product ID")
+
+    existing_product = db.products.find_one({"_id": ObjectId(product_id)})
+
+    if not existing_product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Prevent duplicate SKU (if changed)
+    sku_check = db.products.find_one({
+        "sku": product.sku,
+        "_id": {"$ne": ObjectId(product_id)}
+    })
+
+    if sku_check:
+        raise HTTPException(status_code=400, detail="SKU already exists")
+
+    updated_data = product.dict()
+    updated_data["updated_at"] = datetime.utcnow()
+
+    db.products.update_one(
+        {"_id": ObjectId(product_id)},
+        {"$set": updated_data}
+    )
+
+    return {
+        "message": "Product updated successfully",
+        "id": product_id
+    }
+
+@router.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    
+    file_location = f"static/images/{file.filename}"
+    
+    with open(file_location, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {
+        "image_url": f"/static/images/{file.filename}"
+    }
 
 @router.get("/low-stock")
 def low_stock_products():
