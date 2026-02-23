@@ -87,11 +87,15 @@ def get_reports(
             pid = str(item.get("product_id"))
 
             if pid not in product_summary:
+            # fetch product from products collection
+                product = db.products.find_one({"_id": item.get("product_id")})
+
                 product_summary[pid] = {
                     "name": item.get("name"),
                     "quantity": 0,
                     "revenue": 0,
-                    "profit": 0
+                    "profit": 0,
+                    "image_url": product.get("image_url") if product else None
                 }
 
             product_summary[pid]["quantity"] += quantity
