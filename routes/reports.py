@@ -90,12 +90,14 @@ def get_reports(
             # fetch product from products collection
                 product = db.products.find_one({"_id": item.get("product_id")})
 
+                print(product)
+
                 product_summary[pid] = {
                     "name": item.get("name"),
                     "quantity": 0,
                     "revenue": 0,
                     "profit": 0,
-                    "image_url": product.get("image_url") if product else None
+                    "image_url": item.get("image_url")
                 }
 
             product_summary[pid]["quantity"] += quantity
