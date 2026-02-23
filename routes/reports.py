@@ -1,3 +1,4 @@
+from bson import ObjectId
 from fastapi import APIRouter, Query
 from datetime import datetime, timedelta
 from database import db
@@ -87,17 +88,15 @@ def get_reports(
             pid = str(item.get("product_id"))
 
             if pid not in product_summary:
-            # fetch product from products collection
-                product = db.products.find_one({"_id": item.get("product_id")})
 
-                print(product)
+                product = db.products.find_one({"_id": ObjectId(pid)})
 
                 product_summary[pid] = {
-                    "name": item.get("name"),
+                    "name": product.get("name") if product else item.get("name"),
                     "quantity": 0,
                     "revenue": 0,
                     "profit": 0,
-                    "image_url": item.get("image_url")
+                    "image_url": product.get("image_url") if product else None
                 }
 
             product_summary[pid]["quantity"] += quantity
