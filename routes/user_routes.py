@@ -22,10 +22,12 @@ def signup(user: UserSignup):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
 
+    # Default role = user
     db.users.insert_one({
         "name": user.name,
         "email": user.email,
-        "password": user.password
+        "password": user.password,
+        "role": "user"
     })
 
     return {"message": "User created successfully"}
@@ -46,5 +48,6 @@ def login(user: UserLogin):
     return {
         "message": "Login successful",
         "name": db_user["name"],
-        "email": db_user["email"]
+        "email": db_user["email"],
+        "role": db_user["role"]
     }

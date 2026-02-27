@@ -12,7 +12,12 @@ router = APIRouter()
 LOW_STOCK_LIMIT = 5
 
 @router.post("/add-product")
-def add_product(product: ProductCreate):
+def add_product(product: ProductCreate, email: str):
+
+    user = db.users.find_one({"email": email})
+
+    if not user or user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can add products")
 
     # Check if SKU already exists
     existing = db.products.find_one({"sku": product.sku})
